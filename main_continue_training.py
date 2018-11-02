@@ -40,8 +40,8 @@ def adjustData(img, mask, flag_multi_class, num_class):
         for class_i in range(num_class):
             a = mask == COLOR_DICT[class_i]
             for i in range(1):
-                for j in range(256):
-                    for k in range(256):
+                for j in range(224):    # Attention: The original codes:    for j in range(256):
+                    for k in range(224):    # Attention: The original codes:    for k in range(256):
                         """ Attention:
                             Only [true, true, true] means that this pixel belongs to such class
                         """
@@ -63,7 +63,7 @@ def adjustData(img, mask, flag_multi_class, num_class):
 def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict,
                    image_color_mode="rgb", mask_color_mode="rgb", image_save_prefix="image",
                    mask_save_prefix="mask",
-                   flag_multi_class=True, num_class=2, save_to_dir=None, target_size=(256, 256), seed=1):
+                   flag_multi_class=True, num_class=2, save_to_dir=None, target_size=(224, 224), seed=1):   # Attention: The original codes: target_size=(256, 256)
     ''' Description:
 
         Generate image and mask at the same time
@@ -107,7 +107,7 @@ def trainGenerator(batch_size, train_path, image_folder, mask_folder, aug_dict,
         yield (img, mask)
 
 
-def testGenerator(test_path, num_image=8, target_size=(256, 256), flag_multi_class=True, as_gray=False):
+def testGenerator(test_path, num_image=7, target_size=(224, 224), flag_multi_class=True, as_gray=False):    # Attention: The original codes: target_size=(256, 256)
     for i in range(num_image):
         img = io.imread(os.path.join(test_path, "%d.jpg" % i), as_gray=as_gray)
         img = img / 255
@@ -147,8 +147,8 @@ def labelVisualize(num_class, color_dict, img):
     img_2 = img[:, :, 0]    # Note: img_2.shape = (256, 256) script executed for the shape constructing of img_out
     img_out = np.zeros(img_2.shape + (3,), dtype=np.uint8)  # Note: (256, 256, 3)
     for class_i in range(num_class):
-        for i in range(256):
-            for j in range(256):
+        for i in range(224):    # Attention: The original codes: for i in range(256):
+            for j in range(224):    # Attention: The original codes: for j in range(256):
                 if img[i][j][class_i] > 0.5:
                     img_out[i][j][0] = int(color_dict[class_i][0])
                     img_out[i][j][1] = int(color_dict[class_i][1])
@@ -192,10 +192,10 @@ myGene = trainGenerator(1, 'data/membrane/train', 'image', 'label', data_gen_arg
     while it is existing
     >>>model = unet(pretrained_weights="unet_membrane.hdf5")
 """
-model = unet(pretrained_weights="unet_membrane.hdf5")
+model = unet(pretrained_weights='unet_membrane.hdf5')
 model_checkpoint = ModelCheckpoint('unet_membrane.hdf5', monitor='loss', verbose=1, save_best_only=True)  # Note: the first parameter of the function: filepath: string, path to save the model file.
 model.fit_generator(myGene, steps_per_epoch=100, epochs=10, callbacks=[model_checkpoint])  # Note: myGnene: <generator object trainGenerator at 0x000001B67F9FD830>
 
-testGene = testGenerator("data/membrane/test")
+testGene = testGenerator("data/membrane/test", num_image=8)
 results = model.predict_generator(testGene, 8, verbose=1)  # Note: {ndarray} shape = <class 'tuple'>: (21, 256, 256, 12)
 saveResult("data/membrane/test", results)

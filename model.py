@@ -10,9 +10,11 @@ from keras.layers import *
 from keras.optimizers import *
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 from keras import backend as keras
+from keras.applications import VGG16
 
 
-def unet(pretrained_weights=None, input_size=(256, 256, 3)):
+def unet(pretrained_weights=None, input_size=(224, 224, 3)):    # Attention: The original codes: input_size=(256, 256, 3)
+    """
     inputs = Input(input_size)  # Note: inputs = Tensor("input_1:0", shape=(?, 256, 256, 1), dtype=float32)
     conv1 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(inputs)    # Note: conv1 = Tensor("conv2d_1/Relu:0", shape=(?, 256, 256, 64), dtype=float32); 64 is the num of the filters; 3 is the size of the filters
     conv1 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv1)     # Note: conv1 = Tensor("conv2d_2/Relu:0", shape=(?, 256, 256, 64), dtype=float32); Be careful about the name of the variable while debugging
@@ -57,10 +59,62 @@ def unet(pretrained_weights=None, input_size=(256, 256, 3)):
     conv9 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)    # Note: Tensor("conv2d_18/Relu:0", shape=(?, 256, 256, 64), dtype=float32)
     conv9 = Conv2D(2, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)    # Note: Tensor("conv2d_19/Relu:0", shape=(?, 256, 256, 2), dtype=float32)
 
-    """ Attention: There is a big change, and the original codes is: conv10 = Conv2D(1, 1, activation='sigmoid')(conv9)    # Note: Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)"""
+    # Attention: There is a big change, and the original codes is: conv10 = Conv2D(1, 1, activation='sigmoid')(conv9)
+    # Note: Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)
     conv10 = Conv2D(2, 1, activation='sigmoid')(conv9)    # Note: Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 2), dtype=float32)
 
     model = Model(input=inputs, output=conv10)  # Note: inputs = Tensor("input_1:0", shape=(?, 256, 256, 1), dtype=float32); conv10 = Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)
+
+    # model.compile(optimizer=Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=RMSprop(lr=2e-5), loss='mse', metrics=['acc'])
+
+    model.summary()
+
+    """
+
+    model = VGG16(weights="D:/关键点检测：Clothes_Locating/Clothe_Locating_Test1/vgg16_weights_tf_dim_ordering_tf_kernels.h5", include_top=True)
+    model.layers.pop()
+    model.layers.pop()
+    model.layers.pop()
+    model.layers.pop()
+    model.layers.pop()  # Note: In order to pop the "block5_pool (MaxPooling2D)   (None, 7, 7, 512)         0"
+    drop5 = model.layers[-1].output
+    drop4 = model.layers[13].output
+    conv3 = model.layers[9].output
+    conv2 = model.layers[5].output
+    conv1 = model.layers[2].output
+
+    up6 = Conv2DTranspose(512, (2, 2), strides=(2, 2), activation='relu', padding='same',
+                          kernel_initializer='he_normal')(drop5)    # Note: Tensor("conv2d_transpose_1/Relu:0", shape=(?, ?, ?, 512), dtype=float32)
+    merge6 = concatenate([drop4, up6], axis=3)    # Note: Tensor("concatenate_1/concat:0", shape=(?, 32, 32, 1024), dtype=float32)
+    conv6 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge6)    # Note: Tensor("conv2d_11/Relu:0", shape=(?, 32, 32, 512), dtype=float32)
+    conv6 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv6)    # Note: Tensor("conv2d_12/Relu:0", shape=(?, 32, 32, 512), dtype=float32)
+
+    up7 = Conv2DTranspose(256, (2, 2), strides=(2, 2), activation='relu', padding='same',
+                          kernel_initializer='he_normal')(conv6)    # Note: Tensor("conv2d_transpose_2/Relu:0", shape=(?, ?, ?, 256), dtype=float32)
+    merge7 = concatenate([conv3, up7], axis=3)    # Note: Tensor("concatenate_2/concat:0", shape=(?, 64, 64, 512), dtype=float32)
+    conv7 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge7)    # Note: Tensor("concatenate_2/concat:0", shape=(?, 64, 64, 512), dtype=float32)
+    conv7 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv7)    # Note: Tensor("conv2d_14/Relu:0", shape=(?, 64, 64, 256), dtype=float32)
+
+    up8 = Conv2DTranspose(128, (2, 2), strides=(2, 2), activation='relu', padding='same',
+                          kernel_initializer='he_normal')(conv7)    # Note:
+    merge8 = concatenate([conv2, up8], axis=3)    # Note: Tensor("conv2d_transpose_3/Relu:0", shape=(?, ?, ?, 128), dtype=float32)
+    conv8 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge8)    # Note: Tensor("conv2d_15/Relu:0", shape=(?, 128, 128, 128), dtype=float32)
+    conv8 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv8)    # Note: Tensor("conv2d_16/Relu:0", shape=(?, 128, 128, 128), dtype=float32)
+
+    up9 = Conv2DTranspose(64, (2, 2), strides=(2, 2), activation='relu', padding='same',
+                          kernel_initializer='he_normal')(conv8)    # Note: Tensor("conv2d_transpose_4/Relu:0", shape=(?, ?, ?, 64), dtype=float32)
+    merge9 = concatenate([conv1, up9], axis=3)    # Note: Tensor("concatenate_4/concat:0", shape=(?, 256, 256, 128), dtype=float32)
+    conv9 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(merge9)    # Note: Tensor("conv2d_17/Relu:0", shape=(?, 256, 256, 64), dtype=float32)
+    conv9 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)    # Note: Tensor("conv2d_18/Relu:0", shape=(?, 256, 256, 64), dtype=float32)
+    conv9 = Conv2D(2, 3, activation='relu', padding='same', kernel_initializer='he_normal')(conv9)    # Note: Tensor("conv2d_19/Relu:0", shape=(?, 256, 256, 2), dtype=float32)
+
+    # Attention: There is a big change, and the original codes is: conv10 = Conv2D(1, 1, activation='sigmoid')(conv9)
+    # Note: Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)
+    conv10 = Conv2D(2, 1, activation='sigmoid')(conv9)    # Note: Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 2), dtype=float32)
+
+    # model = Model(input=inputs, output=conv10)  # Note: inputs = Tensor("input_1:0", shape=(?, 256, 256, 1), dtype=float32); conv10 = Tensor("conv2d_20/Sigmoid:0", shape=(?, 256, 256, 1), dtype=float32)
+    model = Model(model.input, conv10)
 
     # model.compile(optimizer=Adam(lr=1e-4), loss='categorical_crossentropy', metrics=['accuracy'])
     model.compile(optimizer=RMSprop(lr=2e-5), loss='mse', metrics=['acc'])
